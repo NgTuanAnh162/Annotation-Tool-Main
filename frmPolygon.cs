@@ -13,6 +13,7 @@ namespace Annotation
     {
         #region Initialization
         private List<Polygon>   polygons = new List<Polygon>();
+        private List<int>       classIDs = new List<int>();
         private Polygon         currentPolygon = null;
         private Polygon         selectedPolygon = null;
         private bool            isDrawing, isDragging = false;
@@ -27,7 +28,8 @@ namespace Annotation
         private int             currentIndex = 0;
         private List<string>    imageFiles;
         private string          currentAnnotationFile = "";
-        private ushort          classID;
+        private List<string>    classNames = new List<string>();
+        private int             classID = 0;
         public frmPolygon()
         {
             InitializeComponent();
@@ -36,6 +38,8 @@ namespace Annotation
             imageFiles = new List<string>();
             datasetDirectory = Path.Combine(rootDir, "images");
             loadDataset(datasetDirectory);
+            loadObjectNames(Path.Combine(rootDir, "cfg\\obj.names"));
+            objectList.SelectedIndex = classID;
         }
         #endregion
         #region Mouse Event
@@ -44,9 +48,12 @@ namespace Annotation
             if (currentPolygon != null)
             {
                 currentPolygon.IsComplete = true;
+                currentPolygon.ID = classID;
                 polygons.Add(currentPolygon);
                 currentPolygon = null;
                 pictureBox1.Invalidate();
+                savePolygonsToFile(currentAnnotationFile);
+                LoadPolygonsFromYoloFile(currentAnnotationFile);
             }
         }
 
@@ -79,6 +86,7 @@ namespace Annotation
                     currentPolygon = new Polygon();
                 }
                 currentPolygon.AddPoint(e.Location);
+                currentPolygon.ID = classID;
                 pictureBox1.Invalidate();
             }
 
@@ -125,9 +133,9 @@ namespace Annotation
         {
             foreach (var polygon in polygons)
             {
-                polygon.Draw(e.Graphics);
+                polygon.Draw(e.Graphics, classNames, polygon.ID);
             }
-            currentPolygon?.Draw(e.Graphics);
+            currentPolygon?.Draw(e.Graphics, classNames, currentPolygon.ID);
         }
         private void frmPolygon_KeyDown(object sender, KeyEventArgs e)
         {
@@ -140,6 +148,42 @@ namespace Annotation
                 pictureBox1.Invalidate(); // Redraw the PictureBox to reflect changes
             }
         }
+        public void loadObjectNames(string filePath)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    classNames = File.ReadAllLines(filePath).ToList();
+                    objectList.Items.Clear();
+                    objectList.Items.AddRange(classNames.ToArray());
+
+                    // Automatically select the first item if there are items in the list
+                    if (objectList.Items.Count > 0)
+                    {
+                        objectList.SelectedIndex = 0;
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("The obj.names file does not exist.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading object names: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void objectList_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (objectList.SelectedIndex >= 0)
+            {
+                classID = objectList.SelectedIndex;
+                //msg.Text = classID.ToString();
+                //MessageBox.Show($"Selected Object: {objectList.SelectedItem}, Class ID: {classID}", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
 
         private void loadDatasetButton_Click(object sender, EventArgs e)
         {
@@ -149,19 +193,6 @@ namespace Annotation
                 {
                     var folderPath = folderBrowserDialog.SelectedPath;
                     loadDataset(folderPath);
-                    //imageFiles = Directory.GetFiles(folderPath, "*.*", SearchOption.TopDirectoryOnly)
-                    //                      .Where(f => f.EndsWith(".jpg") || f.EndsWith(".jpeg") || f.EndsWith(".png"))
-                    //                      .ToList();
-
-                    //if (imageFiles.Any())
-                    //{
-                    //    currentIndex = 0;
-                    //    DisplayCurrentImage();
-                    //}
-                    //else
-                    //{
-                    //    MessageBox.Show("No image files found in the selected folder.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    //}
                 }
             }
         }
@@ -286,6 +317,7 @@ namespace Annotation
         {
             if(currentAnnotationFile != "")
             savePolygonsToFile(currentAnnotationFile);
+            MessageBox.Show("Polygons saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);MessageBox.Show("Polygons saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         public void savePolygonsToFile(string filePath)
@@ -297,11 +329,10 @@ namespace Annotation
                     foreach (var polygon in polygons)
                     {
                         // Convert the points to YOLO format with classID
-                        string yoloFormattedPoints = ConvertToYoloFormat(polygon.Points, 0); // Here, 0 is the classID
+                        string yoloFormattedPoints = ConvertToYoloFormat(polygon.Points, polygon.ID); //test
                         writer.WriteLine(yoloFormattedPoints);
                     }
                 }
-                //MessageBox.Show("Polygons saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -330,6 +361,7 @@ namespace Annotation
                     {
                         var parts = line.Split(' ');
                         // Parse the classID
+                        classIDs = parts[0].Split(',').Select(int.Parse).ToList();
                         int classID = int.Parse(parts[0]);
                         // Parse coordinates and convert from YOLO format to pixel coordinates
                         var points = parts.Skip(1)
@@ -342,7 +374,7 @@ namespace Annotation
                                           .ToList();
                         Polygon polygon = new Polygon
                         {
-                            ClassID = classID,
+                            ID = classID,
                             Points = points,
                             IsComplete = true
                         };
@@ -350,7 +382,6 @@ namespace Annotation
                     }
                 }
                 pictureBox1.Invalidate();
-                //MessageBox.Show("Polygons loaded successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -362,27 +393,40 @@ namespace Annotation
         #region Polygon properties
         public class Polygon
         {
-            public int ClassID { get; set; }
-            //public List<Point> Points { get; private set; } = new List<Point>();
-            public List<Point> Points { get; set; } = new List<Point>();
-            private const int pointRadius = 5;
+            public int ID { get; set; }
+            public List<Point>  Points      { get; set; } = new List<Point>();
+            private const int   pointRadius = 5;
             public bool IsComplete { get; set; } = false;
             public bool IsSelected { get; set; } = false;
             public void AddPoint(Point p)
             {
                 Points.Add(p);
             }
-            public void Draw(Graphics g)
+            public void Draw(Graphics g, List<string> classNames, int currentID)
             {
                 if (Points.Count > 1)
                 {
-                    //Pen pen = IsSelected ? Pens.Blue : Pens.Black;
-                    //g.DrawPolygon(pen, Points.ToArray());
                     g.DrawPolygon(IsSelected ? Pens.Blue : Pens.Black, Points.ToArray());
                 }
                 foreach (var point in Points)
                 {
                     g.FillRectangle(IsComplete ? Brushes.Blue : Brushes.Red, point.X - pointRadius, point.Y - pointRadius, pointRadius * 2, pointRadius * 2);
+                }
+
+                //if (Points.Count > 0)
+                //{
+                //    // Get the class name using the ClassID
+                //    string className = classNames.Count > ID ? classNames[ID] : "Unknown";
+                //    var center = GetPolygonCenter();
+                //    g.DrawString(className, SystemFonts.DefaultFont, Brushes.Black, center);
+                //}
+
+                if (Points.Count > 0)
+                {
+                    // Get the class name using the ClassID
+                    string className = classNames.Count > currentID ? classNames[currentID] : "Unknown";
+                    var center = GetPolygonCenter();
+                    g.DrawString(className, SystemFonts.DefaultFont, Brushes.Black, center);
                 }
             }
             public bool IsInside(Point p)
@@ -399,7 +443,14 @@ namespace Annotation
                 index = Points.FindIndex(pt => Math.Abs(pt.X - p.X) < pointRadius && Math.Abs(pt.Y - p.Y) < pointRadius);
                 return index != -1;
             }
-
+            private Point GetPolygonCenter()
+            {
+                int sumX = Points.Sum(p => p.X);
+                int sumY = Points.Sum(p => p.Y);
+                int centerX = sumX / Points.Count;
+                int centerY = sumY / Points.Count;
+                return new Point(centerX, centerY);
+            }
             public void Move(int dx, int dy, Size bounds)
             {
                 // Check if movement is within bounds

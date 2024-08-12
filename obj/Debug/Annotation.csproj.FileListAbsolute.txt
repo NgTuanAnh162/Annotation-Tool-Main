@@ -22,3 +22,15 @@ C:\C#\Annotation-Tool\obj\Debug\Annotation.csproj.GenerateResource.cache
 C:\C#\Annotation-Tool\obj\Debug\Annotation.csproj.CoreCompileInputs.cache
 C:\C#\Annotation-Tool\obj\Debug\Annotation.exe
 C:\C#\Annotation-Tool\obj\Debug\Annotation.pdb
+D:\Annotation-Tool-Main\bin\Debug\Annotation.exe.config
+D:\Annotation-Tool-Main\bin\Debug\Annotation.exe
+D:\Annotation-Tool-Main\bin\Debug\Annotation.pdb
+D:\Annotation-Tool-Main\obj\Debug\Annotation.csproj.AssemblyReference.cache
+D:\Annotation-Tool-Main\obj\Debug\Annotation.frmMain.resources
+D:\Annotation-Tool-Main\obj\Debug\Annotation.frmPolygon.resources
+D:\Annotation-Tool-Main\obj\Debug\Annotation.frmRectangle.resources
+D:\Annotation-Tool-Main\obj\Debug\Annotation.Properties.Resources.resources
+D:\Annotation-Tool-Main\obj\Debug\Annotation.csproj.GenerateResource.cache
+D:\Annotation-Tool-Main\obj\Debug\Annotation.csproj.CoreCompileInputs.cache
+D:\Annotation-Tool-Main\obj\Debug\Annotation.exe
+D:\Annotation-Tool-Main\obj\Debug\Annotation.pdb
